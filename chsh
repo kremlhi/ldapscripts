@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -o errexit
+
+progname=`basename "$0"`
+errx(){
+	rv=$1; shift
+	echo "${progname}: error: $@" >&2
+	exit "$rv"
+}
+
+( [ $# -eq 2 ] && [ "x$1" = 'x-s' ] ) \
+|| errx 1 "usage: $progname -s <shell>"
+sh=`echo "$2" | sed '/^\/[\/a-z0-9]*$/p;d;q'`
+( [ -n "$sh" ] && grep -xq "$sh" </etc/shells ) \
+|| errx 1 'invalid shell'
+
+#dn=`ldapwhoami 2>/dev/null | sed 's/^dn://p;d'`
+dn=`ldapwhoami | sed 's/^dn://p;d'`
+[ -n "$dn" ] || errx 1 'ldapwhoami'
+
+ldapmodify -Y GSSAPI <<EOF
+dn: $dn
+changetype: modify
+replace: loginShell
+loginShell: $sh
+-
+EOF
+
